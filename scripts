@@ -1,0 +1,32 @@
+#!/bin/bash
+# Project utilities
+
+function fnd {
+    case $1 in
+        compile )
+            solium --dir contracts
+            truffle compile
+            ;;
+        test )
+            solium --dir contracts
+            truffle test
+            ;;
+        lint )
+            solium --dir contracts
+            ;;
+        migrate )
+            truffle migrate
+            ;;
+        help )
+            echo "Usage:"
+            echo "  fnd compile  - Compile (with linting)"
+            echo "  fnd test     - Run tests (with linting)"
+            echo "  fnd lint     - Run the Solium linter on its own"
+            echo "  fnd migrate  - Run migrations"
+            echo "  fnd help     - Show this again"
+            ;;
+        *)
+            fnd help
+            ;;
+    esac
+}
