@@ -5,9 +5,13 @@
 ```
 npm install -g truffle
 npm install -g solium 
+npm install -g testrpc
 
 # in fundle directory
 solium --init
+
+# Start the test chain (needed for running tests)
+testrpc
 ```
 
 ## Useful bash commands:
