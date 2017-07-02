@@ -74,13 +74,13 @@ contract ETFToken {
         // New tokens are first created in the mint...
         balances[this] += _value;
         supply += _value;
+        Issue(_value);
         // ...and then transferred as normal
         doTransfer(this, _recipient, _value);
-        Issue(_value);
         return true;
     }
 
-    /**
+    /*
      * Transfer funds with no checks on whether the message sender is permitted to do that. Those checks
      * should be in the calling function.
      */

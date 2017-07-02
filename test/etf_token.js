@@ -8,7 +8,7 @@ contract('ETFToken clean setup', accounts => {
     // Given
     let instance = await ETFToken.deployed()
     // When
-
+    // (nothing)
     // Then
     let total = await instance.totalSupply.call(bob)  
     assert.equal(0, total.toNumber())
@@ -95,8 +95,63 @@ contract('ETFToken', accounts => {
     assert.equal(startingTotal.toNumber(), total.toNumber())
   });
 
+  it("should trigger a Transfer event when tokens are transferred", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 10, {from: owner})
+    // When
+    let {logs} = await instance.transfer(bob, 5, {from: alice})
+    // Then
+    let expectedTransfer = { event: 'Transfer', args: { _from: alice, _to: bob, _value: 5 }}
+    assert.equal(1, logs.length)
+    assertEventsEqual(expectedTransfer, logs[0])
+  });
+
+  it("should trigger Issue and Transfer events when tokens are issued", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    // When
+    let {logs} = await instance.issueTokens(alice, 10, {from: owner})
+    // Then
+    let expectedIssue = { event: 'Issue', args: { _value: 10 }}
+    let expectedTransfer = { event: 'Transfer', args: { _from: instance.address, _to: alice, _value: 10 }}
+    assert.equal(2, logs.length)
+    assertEventsEqual(expectedIssue, logs[0])
+    assertEventsEqual(expectedTransfer, logs[1])
+  });
+
+  it("should not trigger events when token issue failed", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    // When
+    let {logs} = await instance.issueTokens(alice, 10, {from: bob})
+    // Then
+    assert.equal(0, logs.length)
+  });
 });
 
+
+
+function assertEventsEqual(expected, actual) {
+  assert.equal(expected.event, actual.event)
+  assert.deepEqual(toJS(expected.args), toJS(actual.args))
+}
+
+function toJS(value) {
+  if (typeof value === 'object') {
+    if (typeof value.toNumber === 'function') {
+      return value.toNumber()
+    } else {
+      let result = {}
+      for (var p in value) {
+        result[p] = toJS(value[p])
+      }
+      return result
+    }
+  } else {
+    return value
+  }
+}
 
 function nameAccounts(accounts){
   return {
