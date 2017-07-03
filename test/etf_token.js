@@ -1,4 +1,7 @@
 var ETFToken = artifacts.require("./ETFToken.sol");
+var PartyToken = artifacts.require("../PartyToken.sol");
+var FiestaToken = artifacts.require("../FiestaToken.sol");
+var CarnivalToken = artifacts.require("../CarnivalToken.sol");
 
 contract('ETFToken clean setup', accounts => {
   
@@ -131,6 +134,14 @@ contract('ETFToken', accounts => {
 });
 
 
+function initTestTokens(accounts) {
+  let {owner, alice, bob, claire} = nameAccounts(accounts);
+  return Promise.all([
+    PartyToken.deployed().then(ct => ct.issueTokens(alice, 100)),
+    FiestaToken.deployed().then(ct => ct.issueTokens(bob, 500)),
+    CarnivalToken.deployed().then(ct => ct.issueTokens(claire, 1000))
+  ]).then(([party, fiest, carnival]) => true)
+}
 
 function assertEventsEqual(expected, actual) {
   assert.equal(expected.event, actual.event)
