@@ -94,16 +94,17 @@ contract ETFToken is OwnedToken {
         if (!verifyTokenTypes(_tokens) || _amounts.length != tokenTypes.length) {
             return false;
         }
+        // Solidity doesn't support fractional variable types, so we have to model ratios as numerators, relative to this denominator
+        uint ratioDenominator = 10000000000000000;
+        int precision = int(ratioDenominator / 100000000);
         // Put the _amounts in the same order as the stored tokenTypes...
         uint[] memory amounts = reorderAmounts(_tokens, _amounts);
         // ...ie the same order as these ratios:
-        ufixed0x32[] memory ratios = calculateIdealTokenBasketRatios();
+        uint[] memory ratios = calculateIdealTokenBasketRatios(ratioDenominator);
         uint amountsTotal = sumArray(amounts);
         for (uint i = 0; i < amounts.length; i++) {
-            ufixed0x32 difference = ratios[i] - ufixed0x32(amounts[i]) / ufixed0x32(amountsTotal);
-            // TODO This is pretty arbitrary. We need a more rigorous definition of "close enough"
-            // Also should choose the appropriate ufixed0xXX type for the precision we need.
-            if (difference < ufixed0x32(-0.00001) || difference > ufixed0x32(0.00001)) {
+            int difference = int(ratios[i]) - int(ratioDenominator * amounts[i] / amountsTotal);
+            if (difference > precision || difference < -precision) {
                 return false;
             }
         }
@@ -157,12 +158,14 @@ contract ETFToken is OwnedToken {
         }
     }
 
-    // Calculates the weighting ratios of all the tokens in an ideal basket. The sum should be (approx) 1.
-    function calculateIdealTokenBasketRatios() private returns(ufixed0x32[]) {
+    // Calculates the weighting ratios of all the tokens in an ideal basket.
+    // Solidity doesn't support non-integer variables, so the ratios are relatieve to the large 
+    // number passed as an argument
+    function calculateIdealTokenBasketRatios(uint denominator) private returns(uint[]) {
         uint totalWeight = sumTokenWeightings();
-        ufixed0x32[] memory ratios = new ufixed0x32[](tokenTypes.length);
+        uint[] memory ratios = new uint[](tokenTypes.length);
         for (uint i = 0; i < tokenTypes.length; i++) {
-            ratios[i] = ufixed0x32(tokenWeightings[tokenTypes[i]]) / ufixed0x32(totalWeight);
+            ratios[i] = denominator * tokenWeightings[tokenTypes[i]] / totalWeight;
         }
         return ratios;
     }
