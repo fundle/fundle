@@ -71,7 +71,7 @@ contract('ETFToken', accounts => {
     assert.equal(aliceStartingBalance.toNumber() + 2, aliceBalance.toNumber())
   });
 
-  it("should not allow someone to transfer someone else's tokens", async () => {
+  it("should not allow someone to transfer someone else's tokens without authorization", async () => {
     // Given
     let instance = await ETFToken.deployed()
     await instance.issueTokens(alice, 10, {from: owner})
@@ -113,10 +113,11 @@ contract('ETFToken', accounts => {
   it("should trigger Issue and Transfer events when tokens are issued", async () => {
     // Given
     let instance = await ETFToken.deployed()
+    let initialSupply = await instance.totalSupply.call()
     // When
     let {logs} = await instance.issueTokens(alice, 10, {from: owner})
     // Then
-    let expectedIssue = { event: 'Issue', args: { _value: 10 }}
+    let expectedIssue = { event: 'Issue', args: { _newTotal: initialSupply.toNumber() + 10, _amountIssued: 10 }}
     let expectedTransfer = { event: 'Transfer', args: { _from: instance.address, _to: alice, _value: 10 }}
     assert.equal(2, logs.length)
     assertEventsEqual(expectedIssue, logs[0])
@@ -131,8 +132,103 @@ contract('ETFToken', accounts => {
     // Then
     assert.equal(0, logs.length)
   });
-});
 
+  it("should make your allowance for your own account always equal your balance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 100, {from: owner})
+    let aliceBalanceBefore = await instance.balanceOf.call(alice)
+    // When
+    await instance.approve.call(alice, 20, {from: alice})
+    let allowance = await instance.allowance.call(alice, alice)
+    // Then
+    assert.equal(aliceBalanceBefore.toNumber(), allowance.toNumber())
+  });
+
+  it("should increase someone's allowance when you approve them", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.approve(alice, 5, {from: bob})
+    // When
+    let allowance = await instance.allowance.call(bob, alice)
+    // Then
+    assert.equal(5, allowance.toNumber())
+  });
+
+  it("should send an Approval event when you approve someone's allowance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    // When
+    let {logs} = await instance.approve(alice, 3, {from: bob})
+    // Then
+    let expectedApproval = { event: 'Approval', args: { _owner: bob, _spender: alice, _value: 3 }}
+    assert.equal(1, logs.length)
+    assertEventsEqual(expectedApproval, logs[0])
+  });
+
+  it("should let you transfer someone else's tokens if it is less than your allowance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(bob, 100, {from: owner})
+    await instance.issueTokens(alice, 100, {from: owner})
+    let bobBalanceBefore = await instance.balanceOf.call(bob)
+    let aliceBalanceBefore = await instance.balanceOf.call(alice)
+    await instance.approve(alice, 20, {from: bob})
+    // When
+    await instance.transferFrom(bob, alice, 5, {from: alice})
+    // Then
+    assert.equal(bobBalanceBefore.toNumber() - 5, (await instance.balanceOf.call(bob)).toNumber())
+    assert.equal(aliceBalanceBefore.toNumber() + 5, (await instance.balanceOf.call(alice)).toNumber())
+  });
+
+  it("should let you transfer someone else's tokens if it is equal to your allowance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(bob, 100, {from: owner})
+    await instance.issueTokens(alice, 100, {from: owner})
+    let bobBalanceBefore = await instance.balanceOf.call(bob)
+    let aliceBalanceBefore = await instance.balanceOf.call(alice)
+    await instance.approve(alice, 5, {from: bob})
+    // When
+    await instance.transferFrom(bob, alice, 5, {from: alice})
+    // Then
+    assert.equal(bobBalanceBefore.toNumber() - 5, (await instance.balanceOf.call(bob)).toNumber())
+    assert.equal(aliceBalanceBefore.toNumber() + 5, (await instance.balanceOf.call(alice)).toNumber())
+  });
+
+  it("should not let you transfer someone else's tokens if it is over your allowance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(bob, 100, {from: owner})
+    await instance.issueTokens(alice, 100, {from: owner})
+    let bobBalanceBefore = await instance.balanceOf.call(bob)
+    let aliceBalanceBefore = await instance.balanceOf.call(alice)
+    await instance.approve(alice, 5, {from: bob})
+    // When
+    await instance.transferFrom(bob, alice, 10, {from: alice})
+    // Then
+    assert.equal(bobBalanceBefore.toNumber(), (await instance.balanceOf.call(bob)).toNumber())
+    assert.equal(aliceBalanceBefore.toNumber(), (await instance.balanceOf.call(alice)).toNumber())
+  });
+
+  it("should let you transfer someone elses tokens to a third party if it is over your allowance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(bob, 100, {from: owner})
+    await instance.issueTokens(alice, 200, {from: owner})
+    await instance.issueTokens(claire, 300, {from: owner})
+    let bobBalanceBefore = await instance.balanceOf.call(bob)
+    let aliceBalanceBefore = await instance.balanceOf.call(alice)
+    let claireBalanceBefore = await instance.balanceOf.call(claire)
+    await instance.approve(alice, 10, {from: bob})
+    // When
+    await instance.transferFrom(bob, claire, 10, {from: alice})
+    // Then
+    assert.equal(bobBalanceBefore.toNumber() - 10, (await instance.balanceOf.call(bob)).toNumber())
+    assert.equal(aliceBalanceBefore.toNumber(), (await instance.balanceOf.call(alice)).toNumber())
+    assert.equal(claireBalanceBefore.toNumber() + 10, (await instance.balanceOf.call(claire)).toNumber())
+  });
+});
 
 function initTestTokens(accounts) {
   let {owner, alice, bob, claire} = nameAccounts(accounts);
