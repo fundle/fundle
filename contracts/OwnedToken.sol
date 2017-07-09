@@ -29,6 +29,11 @@ contract OwnedToken {
      */
     event Issue(uint _newTotal, uint _amountIssued);
 
+    /**
+     * Fired when existing tokens are destroyed
+     */ 
+    event Destroy(uint _newTotal, uint _amountDestroyed);
+
     function OwnedToken() {
         owner = tx.origin;
     }
@@ -103,6 +108,29 @@ contract OwnedToken {
         Issue(supply, _value);
         // ...and then transferred as normal
         return _recipient == address(this) || doTransfer(this, _recipient, _value);
+    }
+
+    /**
+     * Destroy tokens belonging to _holder
+     * Returns true if successful; false if the tokens could not be destroyed.
+     * One possible reason for failure is that the specified account did not have enough balance.
+     */
+    function destroyTokens(address _holder, uint _value) returns(bool success) {
+        if (msg.sender != owner) {
+            return false;
+        }
+        if (balances[_holder] < _value) {
+            return false;
+        }
+        // First transfer the tokens to self
+        if (_holder == address(this) || doTransfer(_holder, this, _value)) {
+            balances[this] -= _value;
+            supply -= _value;
+            Destroy(supply, _value);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /*

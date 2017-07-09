@@ -13,7 +13,7 @@ contract('ETFToken clean setup', accounts => {
     // When
     // (nothing)
     // Then
-    let total = await instance.totalSupply.call(bob)  
+    let total = await instance.totalSupply.call()  
     assert.equal(0, total.toNumber())
   });
 });
@@ -47,12 +47,68 @@ contract('ETFToken', accounts => {
   it("should not allow a non-owner to issue tokens", async () => {
     // Given
     let instance = await ETFToken.deployed()
-    let startingTotal = await instance.totalSupply.call(bob)
+    let startingTotal = await instance.totalSupply.call()
     // When
     await instance.issueTokens(alice, 3, {from: alice})
     // Then
-    let total = await instance.totalSupply.call(bob)
+    let total = await instance.totalSupply.call()
     assert.equal(startingTotal.toNumber(), total.toNumber())
+  });
+
+  it("should reduce total supply when tokens are destroyed", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 10, {from: owner})
+    let startingTotal = await instance.totalSupply.call()
+    // When
+    await instance.destroyTokens(alice, 3, {from: owner})
+    // Then
+    let total = await instance.totalSupply.call()
+    assert.equal(startingTotal.toNumber() - 3, total.toNumber())
+  });
+
+  it("should reduce the specified account when tokens are destroyed", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 10, {from: owner})
+    let aliceStartingBalance = await instance.balanceOf.call(alice)
+    // When
+    let success = await instance.destroyTokens(alice, 3, {from: owner})
+    // Then
+    let aliceBalance = await instance.balanceOf.call(alice)
+    assert.equal(aliceStartingBalance.toNumber() - 3, aliceBalance.toNumber())
+  });
+
+  it("should not destroy tokens if the specified account has insufficient balance", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 10, {from: owner})
+    let startingTotal = await instance.totalSupply.call()
+    let aliceStartingBalance = await instance.balanceOf.call(alice)
+    let amountToDestroy = aliceStartingBalance.toNumber() + 1;
+    // When
+    let {logs} = await instance.destroyTokens(alice, amountToDestroy, {from: owner})
+    // Then
+    assert.equal(0, logs.length)
+    let aliceBalance = await instance.balanceOf.call(alice)
+    let total = await instance.totalSupply.call()
+    assert.equal(aliceStartingBalance.toNumber(), aliceBalance.toNumber())
+    assert.equal(startingTotal.toNumber(), total.toNumber())
+  });
+
+  it("should trigger Transfer and Destroy events when tokens are destroyed", async () => {
+    // Given
+    let instance = await ETFToken.deployed()
+    await instance.issueTokens(alice, 10, {from: owner})
+    let initialSupply = await instance.totalSupply.call()
+    // When
+    let {logs} = await instance.destroyTokens(alice, 10, {from: owner})
+    // Then
+    assert.equal(2, logs.length)
+    let expectedTransfer = { event: 'Transfer', args: { _from: alice, _to: instance.address, _value: 10 }}
+    let expectedDestroy = { event: 'Destroy', args: { _newTotal: initialSupply.toNumber() - 10, _amountDestroyed: 10 }}
+    assertEventsEqual(expectedTransfer, logs[0])
+    assertEventsEqual(expectedDestroy, logs[1])
   });
 
   it("should allow someone to transfer their own tokens", async () => {
