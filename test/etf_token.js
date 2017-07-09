@@ -267,7 +267,7 @@ contract('ETFToken', accounts => {
     assert.equal(aliceBalanceBefore.toNumber(), (await instance.balanceOf.call(alice)).toNumber())
   });
 
-  it("should let you transfer someone elses tokens to a third party if it is over your allowance", async () => {
+  it("should let you transfer someone elses tokens to a third party if it is within your allowance", async () => {
     // Given
     let instance = await ETFToken.deployed()
     await instance.issueTokens(bob, 100, {from: owner})
